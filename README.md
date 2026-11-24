@@ -24,12 +24,26 @@ python -m roteador config/r1.txt
 ```
 
 `config/r1.txt` … `config/r5.txt` são a topologia de referência, todos em
-`127.0.0.1` com portas 6001–6005. Para subir os cinco de uma vez, cada um
-num console:
+`127.0.0.1` com portas 6001–6005. No Windows, o comando abaixo abre um
+console por roteador:
 
 ```text
 python ferramentas/subir_topologia.py
 ```
+
+No macOS e no Linux, abra um terminal por roteador e rode
+`python -m roteador config/rN.txt`, trocando `N` pelo número do roteador.
+Para uma captura sem comandos interativos, use o launcher em segundo plano
+em qualquer plataforma:
+
+```text
+python ferramentas/subir_topologia.py --fundo
+python ferramentas/subir_topologia.py encerrar
+```
+
+Enquanto estiverem em segundo plano, os roteadores gravam a saída em
+`logs/rN.out` e podem ser controlados pelo launcher com `derrubar`, `religar`
+e `encerrar`.
 
 Na rede real, copie `config/exemplo_rede_real.txt`, coloque o IP que o
 `ipconfig` (Windows) ou o `ip a` (Linux) mostrar e libere a porta UDP no
@@ -83,14 +97,15 @@ atendidos pelo roteador `10.99.1.1`: a rede é a `10.99.1.0/24`.
 
 ## O que o log registra
 
-Arquivo `logs/10.99.1.1.log` e o mesmo texto no terminal, com horário e
+Arquivo `logs/10.99.1.1.log` e o mesmo texto no terminal, com data, horário e
 campos `chave=valor`. Entram vizinho ativo/inativo, LSP gerado, LSP novo,
 cópia descartada, LSP expirado, recálculo (com o que mudou e o tempo),
 pacote encaminhado (próximo salto e TTL) e ICMP gerado.
 
 `python ferramentas/analisar_logs.py logs` conta esses eventos. Se
 `logs/controle.log` tiver um `derrubar` feito pelo `subir_topologia.py`,
-o script mede o intervalo até o `ROTAS-RECALCULADAS` de cada roteador.
+o script mede o intervalo até o primeiro `ROTAS-RECALCULADAS` com uma
+alteração na tabela de cada roteador.
 
 ## Temporizadores
 

@@ -1,4 +1,4 @@
-"""Três processos de verdade em 127.0.0.1, com o tempo acelerado.
+"""Dois processos de verdade em 127.0.0.1, com o tempo acelerado.
 
 Cobre o socket único, as threads e o terminal. O restante do protocolo é
 provado na rede simulada, que não depende do relógio da máquina.
@@ -49,6 +49,7 @@ class TestUdpReal(unittest.TestCase):
             saidas: list[list[str]] = []
             try:
                 for nome in ("r1.txt", "r2.txt"):
+                    sem_terminal = nome == "r2.txt"
                     proc = subprocess.Popen(
                         [
                             sys.executable,
@@ -57,9 +58,10 @@ class TestUdpReal(unittest.TestCase):
                             str(base / nome),
                             "--escala-tempo",
                             "0.1",
+                            *(["--sem-terminal"] if sem_terminal else []),
                         ],
                         cwd=RAIZ,
-                        stdin=subprocess.PIPE,
+                        stdin=subprocess.DEVNULL if sem_terminal else subprocess.PIPE,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.STDOUT,
                         text=True,

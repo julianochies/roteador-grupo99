@@ -6,8 +6,9 @@
     python ferramentas/subir_topologia.py religar 3
     python ferramentas/subir_topologia.py encerrar
 
-No modo normal, cada roteador abre o próprio console. `--fundo` deixa os
-processos sem teclado e manda a saída para logs/rN.out, útil para captura.
+No Windows, o modo normal abre um console por roteador. Em outros sistemas,
+rode `python -m roteador config/rN.txt` em terminais separados ou use
+`--fundo` para gravar a saída em logs/rN.out sem ler comandos.
 `derrubar` registra o horário em logs/controle.log para o analisar_logs.py.
 """
 
@@ -51,11 +52,16 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _subir(diretorio: Path, fundo: bool, escala: float) -> int:
+    if not _modo_disponivel(fundo):
+        return 2
     arquivos = sorted(diretorio.glob("r*.txt"))
     if not arquivos:
         print(f"nenhum rN.txt em {diretorio}", file=sys.stderr)
         return 2
     estado = _ler_estado()
+    if any(info.get("vivo") for info in estado.values()):
+        print("topologia ja iniciada; use encerrar antes de subir novamente", file=sys.stderr)
+        return 2
     for arquivo in arquivos:
         numero = int(arquivo.stem[1:])
         _iniciar(numero, arquivo, fundo, escala, estado)
@@ -67,19 +73,21 @@ def _subir(diretorio: Path, fundo: bool, escala: float) -> int:
 def _iniciar(numero: int, arquivo: Path, fundo: bool, escala: float, estado: dict) -> None:
     cmd = [sys.executable, "-m", "roteador", str(arquivo), "--escala-tempo", str(escala)]
     if fundo:
+        cmd.append("--sem-terminal")
         destino = RAIZ / "logs"
         destino.mkdir(parents=True, exist_ok=True)
-        saida = open(destino / f"r{numero}.out", "a", encoding="utf-8")
-        proc = subprocess.Popen(
-            cmd,
-            cwd=RAIZ,
-            stdin=subprocess.DEVNULL,
-            stdout=saida,
-            stderr=subprocess.STDOUT,
-        )
+        with (destino / f"r{numero}.out").open("a", encoding="utf-8") as saida:
+            proc = subprocess.Popen(
+                cmd,
+                cwd=RAIZ,
+                stdin=subprocess.DEVNULL,
+                stdout=saida,
+                stderr=subprocess.STDOUT,
+                start_new_session=os.name == "posix",
+                creationflags=getattr(subprocess, "DETACHED_PROCESS", 0),
+            )
     else:
-        flags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
-        proc = subprocess.Popen(cmd, cwd=RAIZ, creationflags=flags)
+        proc = subprocess.Popen(cmd, cwd=RAIZ, creationflags=subprocess.CREATE_NEW_CONSOLE)
     estado[str(numero)] = {
         "pid": proc.pid,
         "config": str(arquivo),
@@ -87,6 +95,16 @@ def _iniciar(numero: int, arquivo: Path, fundo: bool, escala: float, estado: dic
         "fundo": fundo,
     }
     print(f"r{numero} pid={proc.pid}")
+
+
+def _modo_disponivel(fundo: bool) -> bool:
+    if fundo or os.name == "nt":
+        return True
+    print(
+        "use --fundo ou rode python -m roteador <config> em terminais separados",
+        file=sys.stderr,
+    )
+    return False
 
 
 def _derrubar(numero: int) -> int:
@@ -109,9 +127,12 @@ def _religar(numero: int, fundo: bool, escala: float) -> int:
     if info is None:
         print(f"r{numero} nao foi iniciado por este script", file=sys.stderr)
         return 2
+    fundo = fundo or info.get("fundo", False)
+    if not _modo_disponivel(fundo):
+        return 2
     if info.get("vivo"):
         _matar(info["pid"])
-    _iniciar(numero, Path(info["config"]), fundo or info.get("fundo", False), escala, estado)
+    _iniciar(numero, Path(info["config"]), fundo, escala, estado)
     _salvar_estado(estado)
     _controle(f"acao=religar roteador={numero}")
     return 0
@@ -138,8 +159,7 @@ def _matar(pid: int) -> None:
 
 def _controle(campos: str) -> None:
     CONTROLE.parent.mkdir(parents=True, exist_ok=True)
-    agora = datetime.now()
-    hora = agora.strftime("%H:%M:%S") + f".{agora.microsecond // 1000:03d}"
+    hora = datetime.now().isoformat(timespec="milliseconds")
     with CONTROLE.open("a", encoding="utf-8") as arquivo:
         arquivo.write(f"{hora} CONTROLE {campos}\n")
 

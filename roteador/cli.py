@@ -233,9 +233,10 @@ def _ping(partes: list[str]) -> Pedido:
         return PedidoInvalido(erro)
     ttl = 16
     if len(partes) == 3:
-        if not partes[2].isdigit():
+        valor = partes[2].lstrip("0")
+        if not valor.isascii() or not valor.isdigit() or len(valor) > 3:
             return PedidoInvalido("ttl deve ser inteiro entre 1 e 255")
-        ttl = int(partes[2])
+        ttl = int(valor)
         if not 1 <= ttl <= 255:
             return PedidoInvalido("ttl deve ser inteiro entre 1 e 255")
     return PedidoPing(destino, ttl)

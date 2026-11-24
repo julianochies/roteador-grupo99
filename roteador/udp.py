@@ -34,8 +34,8 @@ class RoteadorUDP:
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind(("0.0.0.0", nucleo.config.porta))
 
-    def servir(self) -> None:
-        """Sobe recepção e temporizador e lê o terminal nesta thread."""
+    def servir(self, *, sem_terminal: bool = False) -> None:
+        """Sobe recepção e temporizador; lê comandos no modo interativo."""
         recepcao = threading.Thread(target=self._loop_recepcao, name="recepcao", daemon=True)
         temporizador = threading.Thread(target=self._loop_tempo, name="tempo", daemon=True)
         recepcao.start()
@@ -43,9 +43,12 @@ class RoteadorUDP:
         self._anunciar(
             f"roteador {self.nucleo.endereco} escutando UDP {self.nucleo.config.porta}"
         )
-        self._anunciar("digite ajuda para a lista de comandos")
         try:
-            self._loop_terminal()
+            if sem_terminal:
+                self._parar.wait()
+            else:
+                self._anunciar("digite ajuda para a lista de comandos")
+                self._loop_terminal()
         except KeyboardInterrupt:
             self._anunciar("encerrando")
         finally:

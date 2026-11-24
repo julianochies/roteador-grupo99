@@ -20,6 +20,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("config", help="arquivo de configuracao do roteador")
     parser.add_argument(
+        "--sem-terminal",
+        action="store_true",
+        help="executa sem ler comandos do terminal",
+    )
+    parser.add_argument(
         "--escala-tempo",
         type=float,
         default=1.0,
@@ -71,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     log = Log(config.endereco)
     try:
-        RoteadorUDP(nucleo, relogio, log).servir()
+        RoteadorUDP(nucleo, relogio, log).servir(sem_terminal=args.sem_terminal)
     except OSError as erro:
         print(f"nao foi possivel abrir a porta {config.porta}: {erro}", file=sys.stderr)
         return 1
