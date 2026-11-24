@@ -19,6 +19,7 @@ def main(argv: list[str] | None = None) -> int:
         description="Roteador de estado de enlace sobre UDP.",
     )
     parser.add_argument("config", help="arquivo de configuracao do roteador")
+    parser.add_argument("--id-lancamento", help=argparse.SUPPRESS)
     parser.add_argument(
         "--sem-terminal",
         action="store_true",
