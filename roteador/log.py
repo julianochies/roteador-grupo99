@@ -16,7 +16,7 @@ from roteador.eventos import Evento
 
 def formatar_linha(evento: Evento, quando: datetime | None = None) -> str:
     momento = quando or datetime.now()
-    hora = momento.strftime("%H:%M:%S") + f".{momento.microsecond // 1000:03d}"
+    hora = momento.isoformat(timespec="milliseconds")
     campos = " ".join(f"{chave}={valor}" for chave, valor in evento.campos)
     if campos:
         return f"{hora} {evento.tipo} {campos}"

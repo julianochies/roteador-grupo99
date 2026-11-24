@@ -23,12 +23,12 @@ def analisar_endereco(texto: str) -> str:
         raise EnderecoInvalido(f"endereco virtual precisa de 4 octetos: {texto!r}")
     numeros: list[int] = []
     for parte in partes:
-        if not parte.isdigit():
+        if not parte.isascii() or not parte.isdigit():
             raise EnderecoInvalido(f"octeto invalido em {texto!r}")
-        valor = int(parte)
-        if valor > 255:
+        digitos = parte.lstrip("0") or "0"
+        if len(digitos) > 3 or int(digitos) > 255:
             raise EnderecoInvalido(f"octeto fora de 0-255 em {texto!r}")
-        numeros.append(valor)
+        numeros.append(int(digitos))
     if numeros[0] != 10:
         raise EnderecoInvalido(f"endereco virtual deve comecar com 10: {texto!r}")
     return ".".join(str(n) for n in numeros)

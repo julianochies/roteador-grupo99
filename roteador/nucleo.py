@@ -86,8 +86,10 @@ class RoteadorNucleo:
         self.proxima_renovacao = 0.0
         self._ja_gerou = False
         self.pendentes: dict[int, tuple[str, float]] = {}
+        # Erros ICMP carregam só o id original. A paridade distingue um
+        # DADOS de um ping mesmo depois que o pedido de eco expirou.
         self._proximo_id_ping = 1
-        self._proximo_id_dados = 1
+        self._proximo_id_dados = 2
         self.perda_lsp = perda_lsp
         self._rng = random.Random(semente)
         self.perder_proxima = set(perder_proximo_lsp_de or ())
@@ -352,7 +354,7 @@ class RoteadorNucleo:
             saida.mensagens.append(f"destino inalcancavel: {destino}")
             return
         pacote = Dados(self.endereco, destino, TTL_PADRAO, self._proximo_id_dados, texto)
-        self._proximo_id_dados += 1
+        self._proximo_id_dados += 2
         if self._enviar_originado(pacote, saida=saida):
             if not mesma_rede(destino, self.endereco):
                 saida.mensagens.append(f"msg enviada para {destino}")
@@ -364,7 +366,7 @@ class RoteadorNucleo:
             saida.mensagens.append(f"destino inalcancavel: {destino}")
             return
         id_pacote = self._proximo_id_ping
-        self._proximo_id_ping += 1
+        self._proximo_id_ping += 2
         self.pendentes[id_pacote] = (destino, now)
         saida.mensagens.append(f"ping {destino} id={id_pacote} ttl={ttl}")
         pedido = Icmp(self.endereco, destino, ttl, id_pacote, 8)
@@ -395,8 +397,20 @@ class RoteadorNucleo:
         return True
 
     def _mostrar_resposta(self, pacote: Icmp, now: float, saida: Saida) -> None:
-        pendente = self.pendentes.pop(pacote.id, None)
-        rtt = None if pendente is None else (now - pendente[1]) * 1000
+        pendente = self.pendentes.get(pacote.id)
+        rtt = None
+        if pendente is None:
+            if pacote.tipo == 0 or pacote.id % 2 == 1:
+                return
+        else:
+            if pacote.tipo == 0 and pacote.origem != pendente[0]:
+                return
+            _destino, enviado = pendente
+            if now - enviado >= PING_TIMEOUT:
+                self._registrar_timeout(pacote.id, saida)
+                return
+            del self.pendentes[pacote.id]
+            rtt = (now - enviado) * 1000
         saida.mensagens.append(
             texto_resultado_icmp(pacote.tipo, pacote.origem, pacote.id, rtt)
         )
@@ -469,8 +483,11 @@ class RoteadorNucleo:
             if now - enviado >= PING_TIMEOUT
         ]
         for id_pacote in vencidos:
-            destino, _enviado = self.pendentes.pop(id_pacote)
-            saida.mensagens.append(f"timeout id={id_pacote} destino={destino}")
+            self._registrar_timeout(id_pacote, saida)
+
+    def _registrar_timeout(self, id_pacote: int, saida: Saida) -> None:
+        destino, _enviado = self.pendentes.pop(id_pacote)
+        saida.mensagens.append(f"timeout id={id_pacote} destino={destino}")
 
     def _recalcular(self, saida: Saida) -> None:
         inicio = time.perf_counter()

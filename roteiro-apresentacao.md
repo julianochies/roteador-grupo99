@@ -8,7 +8,7 @@ No estado normal, R1 chega em R3 por R2 (custo 3), não pelo enlace direto (cust
 
 ## Ensaio nesta máquina, agora
 
-Na pasta do projeto, com os cinco roteadores do relatório já encerrados:
+No Windows, na pasta do projeto, com os cinco roteadores do relatório já encerrados:
 
 ```text
 python ferramentas/subir_topologia.py encerrar
@@ -32,6 +32,19 @@ No fim:
 ```text
 python ferramentas/subir_topologia.py encerrar
 ```
+
+No macOS e no Linux, abra três terminais na pasta do projeto e execute um
+comando por terminal:
+
+```text
+python -m roteador config/apresentacao/r1.txt
+python -m roteador config/apresentacao/r2.txt
+python -m roteador config/apresentacao/r3.txt
+```
+
+Para simular a queda de R2, use `sair` no terminal dele e espere 25 segundos.
+Para religá-lo, execute o mesmo comando de novo. No fim, use `sair` em cada
+terminal.
 
 ## Na VDI, antes de começar
 
@@ -94,7 +107,7 @@ R3, `tabela`:
 
 R3 não usa o enlace direto com R1. Esse enlace custa 5. O caminho R3–R2–R1 custa 3.
 
-No `lsdb` dos três, as mesmas cinco linhas de vizinho: R1 com `10.99.2.1=1;10.99.3.1=5`, R2 com `10.99.1.1=1;10.99.3.1=2`, R3 com `10.99.1.1=5;10.99.2.1=2`.
+No `lsdb` dos três, as mesmas três entradas: R1 com `10.99.2.1=1;10.99.3.1=5`, R2 com `10.99.1.1=1;10.99.3.1=2`, R3 com `10.99.1.1=5;10.99.2.1=2`.
 
 ### 2. Ping com TTL crescente e uma mensagem
 
@@ -158,13 +171,17 @@ Agora a resposta é `eco de 10.99.3.1`, porque R3 virou vizinho de um salto só.
 
 Se cair o R3, a rota para `10.99.3.0/24` some nos outros dois. `ping 10.99.3.1` passa a responder `destino inalcancavel: 10.99.3.1`. Não há caminho novo para mostrar. Digam isso e sigam.
 
-Se cair o R1, quem apresenta o ping é o R3:
+Se cair o R1, R3 pode mostrar que `ping 10.99.1.1` fica inalcançável e que
+R2 continua acessível com `ping 10.99.2.1 1`.
+
+Se cair só o enlace R2–R3, R3 pode mostrar a rota alternativa para R1:
 
 ```text
 ping 10.99.1.1 1
 ```
 
-Antes da queda, tempo excedido vindo do R2. Depois, eco vindo do R1 pelo enlace direto de custo 5.
+Antes da queda do enlace, R2 devolve tempo excedido. Depois, R1 responde
+ao eco pelo enlace direto de custo 5.
 
 Quando o professor mandar religar, a pessoa sobe de novo o mesmo comando (`python -m roteador config/vdi/rN.txt`). Esperem uns 15 segundos. A `tabela` volta ao normal. O LSP novo tem sequência maior e é aceito.
 

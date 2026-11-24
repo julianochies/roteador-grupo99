@@ -3,14 +3,14 @@
     python ferramentas/analisar_logs.py logs
 
 Cada arquivo `10.G.R.1.log` entra na contagem. Se existir `controle.log`
-com `acao=derrubar`, o intervalo até o próximo `ROTAS-RECALCULADAS` de cada
-roteador é o tempo de convergência visto por aquele roteador.
+com `acao=derrubar`, mede até a primeira alteração na tabela de cada roteador.
 """
 
 from __future__ import annotations
 
 import argparse
 import sys
+from datetime import datetime
 from pathlib import Path
 
 
@@ -60,12 +60,13 @@ def _convergencia(controle: Path, arquivos: list[Path]) -> None:
     marcas = []
     for linha in controle.read_text(encoding="utf-8").splitlines():
         evento = _parse(linha)
-        if evento and evento["tipo"] == "CONTROLE" and "derrubar" in evento["resto"]:
+        if evento and evento["tipo"] == "CONTROLE" and "acao=derrubar" in evento["resto"].split():
             marcas.append(evento)
     if not marcas:
         print("controle.log sem acao=derrubar")
         return
     marca = marcas[-1]
+    marca_datada = "T" in marca["hora"]
     print(f"ultimo derrubar as {marca['hora']}")
     for arquivo in arquivos:
         eventos = [
@@ -73,21 +74,19 @@ def _convergencia(controle: Path, arquivos: list[Path]) -> None:
             for linha in arquivo.read_text(encoding="utf-8").splitlines()
             if (e := _parse(linha)) is not None
         ]
-        seguinte = next(
-            (
-                e
-                for e in eventos
-                if e["tipo"] == "ROTAS-RECALCULADAS" and _segundos(e["hora"]) >= _segundos(marca["hora"])
-            ),
-            None,
+        mudancas = (
+            (_delta(marca["hora"], e["hora"]), e["hora"])
+            for e in eventos
+            if e["tipo"] == "ROTAS-RECALCULADAS"
+            and (not marca_datada or "T" in e["hora"])
+            and any(c.startswith("mudou=") and c != "mudou=-" for c in e["resto"].split())
         )
+        seguinte = min((item for item in mudancas if item[0] >= 0), default=None)
         if seguinte is None:
-            print(f"  {arquivo.name}: sem ROTAS-RECALCULADAS depois do derrubar")
+            print(f"  {arquivo.name}: sem mudança de rota depois do derrubar")
             continue
-        delta = _segundos(seguinte["hora"]) - _segundos(marca["hora"])
-        if delta < 0:
-            delta += 24 * 3600
-        print(f"  {arquivo.name}: recálculo {delta:.3f}s depois ({seguinte['hora']})")
+        delta, hora = seguinte
+        print(f"  {arquivo.name}: recálculo com mudança {delta:.3f}s depois ({hora})")
 
 
 def _parse(linha: str) -> dict | None:
@@ -102,6 +101,15 @@ def _segundos(hora: str) -> float:
     horas, minutos, segundos = (int(p) for p in hms.split(":"))
     mili = int((frac + "000")[:3]) if ponto else 0
     return horas * 3600 + minutos * 60 + segundos + mili / 1000
+
+
+def _delta(inicio: str, fim: str) -> float:
+    if "T" in inicio and "T" in fim:
+        return (datetime.fromisoformat(fim) - datetime.fromisoformat(inicio)).total_seconds()
+    # Sem a data nos logs antigos, interpreta a hora mais próxima da queda.
+    dia = 24 * 3600
+    delta = _segundos(fim.rsplit("T", 1)[-1]) - _segundos(inicio.rsplit("T", 1)[-1])
+    return (delta + dia / 2) % dia - dia / 2
 
 
 if __name__ == "__main__":
