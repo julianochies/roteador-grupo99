@@ -1,0 +1,7 @@
+# R3 do grupo 99. Rode na VM de quem ficar com o 10.99.3.1.
+# Antes de subir: troque IP_DO_R1 e IP_DO_R2 pelo IPv4 do ipconfig de cada VM.
+endereco 10.99.3.1
+porta 6000
+# vizinho <IP real> <porta UDP> <custo>
+vizinho IP_DO_R2 6000 2
+vizinho IP_DO_R1 6000 5

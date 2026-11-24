@@ -1,0 +1,159 @@
+"""Sobe, derruba e religa os roteadores da pasta config/.
+
+    python ferramentas/subir_topologia.py
+    python ferramentas/subir_topologia.py --fundo
+    python ferramentas/subir_topologia.py derrubar 3
+    python ferramentas/subir_topologia.py religar 3
+    python ferramentas/subir_topologia.py encerrar
+
+No modo normal, cada roteador abre o próprio console. `--fundo` deixa os
+processos sem teclado e manda a saída para logs/rN.out, útil para captura.
+`derrubar` registra o horário em logs/controle.log para o analisar_logs.py.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import signal
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+
+RAIZ = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(RAIZ))
+
+ESTADO = RAIZ / "logs" / "processos.json"
+CONTROLE = RAIZ / "logs" / "controle.log"
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Sobe a topologia local.")
+    parser.add_argument("acao", nargs="?", default="subir", choices=["subir", "derrubar", "religar", "encerrar"])
+    parser.add_argument("roteador", nargs="?", type=int)
+    parser.add_argument("--fundo", action="store_true", help="roda sem abrir console")
+    parser.add_argument("--diretorio", default="config")
+    parser.add_argument("--escala-tempo", type=float, default=1.0)
+    args = parser.parse_args(argv)
+
+    if args.acao == "subir":
+        return _subir(Path(args.diretorio), args.fundo, args.escala_tempo)
+    if args.acao in ("derrubar", "religar") and args.roteador is None:
+        print("informe o numero do roteador", file=sys.stderr)
+        return 2
+    if args.acao == "derrubar":
+        return _derrubar(args.roteador)
+    if args.acao == "religar":
+        return _religar(args.roteador, args.fundo, args.escala_tempo)
+    return _encerrar()
+
+
+def _subir(diretorio: Path, fundo: bool, escala: float) -> int:
+    arquivos = sorted(diretorio.glob("r*.txt"))
+    if not arquivos:
+        print(f"nenhum rN.txt em {diretorio}", file=sys.stderr)
+        return 2
+    estado = _ler_estado()
+    for arquivo in arquivos:
+        numero = int(arquivo.stem[1:])
+        _iniciar(numero, arquivo, fundo, escala, estado)
+    _salvar_estado(estado)
+    print(f"{len(arquivos)} roteadores no ar")
+    return 0
+
+
+def _iniciar(numero: int, arquivo: Path, fundo: bool, escala: float, estado: dict) -> None:
+    cmd = [sys.executable, "-m", "roteador", str(arquivo), "--escala-tempo", str(escala)]
+    if fundo:
+        destino = RAIZ / "logs"
+        destino.mkdir(parents=True, exist_ok=True)
+        saida = open(destino / f"r{numero}.out", "a", encoding="utf-8")
+        proc = subprocess.Popen(
+            cmd,
+            cwd=RAIZ,
+            stdin=subprocess.DEVNULL,
+            stdout=saida,
+            stderr=subprocess.STDOUT,
+        )
+    else:
+        flags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
+        proc = subprocess.Popen(cmd, cwd=RAIZ, creationflags=flags)
+    estado[str(numero)] = {
+        "pid": proc.pid,
+        "config": str(arquivo),
+        "vivo": True,
+        "fundo": fundo,
+    }
+    print(f"r{numero} pid={proc.pid}")
+
+
+def _derrubar(numero: int) -> int:
+    estado = _ler_estado()
+    info = estado.get(str(numero))
+    if not info or not info.get("vivo"):
+        print(f"r{numero} nao esta no ar", file=sys.stderr)
+        return 2
+    _matar(info["pid"])
+    info["vivo"] = False
+    _salvar_estado(estado)
+    _controle(f"acao=derrubar roteador={numero}")
+    print(f"r{numero} derrubado")
+    return 0
+
+
+def _religar(numero: int, fundo: bool, escala: float) -> int:
+    estado = _ler_estado()
+    info = estado.get(str(numero))
+    if info is None:
+        print(f"r{numero} nao foi iniciado por este script", file=sys.stderr)
+        return 2
+    if info.get("vivo"):
+        _matar(info["pid"])
+    _iniciar(numero, Path(info["config"]), fundo or info.get("fundo", False), escala, estado)
+    _salvar_estado(estado)
+    _controle(f"acao=religar roteador={numero}")
+    return 0
+
+
+def _encerrar() -> int:
+    estado = _ler_estado()
+    for info in estado.values():
+        if info.get("vivo"):
+            _matar(info["pid"])
+            info["vivo"] = False
+    _salvar_estado(estado)
+    _controle("acao=encerrar")
+    print("topologia encerrada")
+    return 0
+
+
+def _matar(pid: int) -> None:
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except OSError:
+        pass
+
+
+def _controle(campos: str) -> None:
+    CONTROLE.parent.mkdir(parents=True, exist_ok=True)
+    agora = datetime.now()
+    hora = agora.strftime("%H:%M:%S") + f".{agora.microsecond // 1000:03d}"
+    with CONTROLE.open("a", encoding="utf-8") as arquivo:
+        arquivo.write(f"{hora} CONTROLE {campos}\n")
+
+
+def _ler_estado() -> dict:
+    if not ESTADO.exists():
+        return {}
+    return json.loads(ESTADO.read_text(encoding="utf-8"))
+
+
+def _salvar_estado(estado: dict) -> None:
+    ESTADO.parent.mkdir(parents=True, exist_ok=True)
+    ESTADO.write_text(json.dumps(estado, indent=2), encoding="utf-8")
+
+
+if __name__ == "__main__":
+    sys.exit(main())

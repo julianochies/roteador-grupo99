@@ -1,0 +1,4 @@
+# Número do grupo no Moodle. Os endereços virtuais são 10.99.R.1.
+# Gerar de novo:
+#   python ferramentas/gerar_topologia.py "1-2:1,2-3:2,1-4:5,3-4:1,3-5:3,4-5:1" --grupo 99 --porta-base 6001
+grupo 99

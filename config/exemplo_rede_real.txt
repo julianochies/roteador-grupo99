@@ -1,0 +1,12 @@
+# Modelo para a rede real (VDI ou access point).
+# O IP muda com o DHCP: rode ipconfig (Windows) ou ip a (Linux) e edite.
+# Os dois lados do enlace precisam listar um ao outro, com o mesmo custo.
+# Interoperabilidade: uma linha vizinho a mais, com o IP e a porta do outro grupo.
+
+endereco 10.99.1.1
+porta 6000
+
+# vizinho <IP real> <porta UDP> <custo>
+vizinho 192.168.0.11 6000 1
+vizinho 192.168.0.12 6000 5
+# vizinho 192.168.0.31 6000 2

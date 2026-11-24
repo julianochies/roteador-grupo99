@@ -1,0 +1,6 @@
+# Roteador 5 do grupo 99
+endereco 10.99.5.1
+porta 6005
+# vizinho <IP real> <porta UDP> <custo>
+vizinho 127.0.0.1 6003 3
+vizinho 127.0.0.1 6004 1

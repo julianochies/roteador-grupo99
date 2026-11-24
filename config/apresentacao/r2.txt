@@ -1,0 +1,6 @@
+# R2 do grupo 99. Ensaio local.
+endereco 10.99.2.1
+porta 6002
+# vizinho <IP real> <porta UDP> <custo>
+vizinho 127.0.0.1 6001 1
+vizinho 127.0.0.1 6003 2

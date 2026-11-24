@@ -1,0 +1,11 @@
+# R1 do grupo 99. Rode na VM de quem ficar com o 10.99.1.1.
+# Antes de subir: troque IP_DO_R2 e IP_DO_R3 pelo IPv4 do ipconfig de cada VM.
+endereco 10.99.1.1
+porta 6000
+# vizinho <IP real> <porta UDP> <custo>
+vizinho IP_DO_R2 6000 1
+vizinho IP_DO_R3 6000 5
+
+# Interoperabilidade. Descomente, troque os dois campos e reinicie só este roteador.
+# O outro grupo faz a linha espelhada, com o IP desta VM e o mesmo custo.
+# vizinho IP_DO_OUTRO_GRUPO 6000 2

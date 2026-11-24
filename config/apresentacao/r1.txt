@@ -1,0 +1,6 @@
+# R1 do grupo 99. Ensaio local: Juliano, ou quem ficar com este roteador.
+endereco 10.99.1.1
+porta 6001
+# vizinho <IP real> <porta UDP> <custo>
+vizinho 127.0.0.1 6002 1
+vizinho 127.0.0.1 6003 5
